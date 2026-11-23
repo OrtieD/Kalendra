@@ -1,0 +1,60 @@
+name: Release
+
+# Builds Kalendra for Windows and publishes a GitHub release.
+# Start: Actions → Release → "Run workflow" (enter version), or push a tag like v1.2.3.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, z. B. 1.0.2"
+        required: true
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version bestimmen
+        run: |
+          V="${{ github.event.inputs.version }}"
+          [ -z "$V" ] && V="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: NSIS installieren
+        run: sudo apt-get update && sudo apt-get install -y nsis zip
+
+      - name: Kalendra.exe bauen
+        run: >
+          dotnet publish src/Kalendra -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none
+          -p:Version=$VERSION -o publish
+
+      - name: Installer und ZIPs erstellen
+        run: |
+          mkdir -p dist
+          (cd installer && makensis -V2 -DVERSION=$VERSION -DSRC=../publish kalendra.nsi)
+          (cd installer && zip -9 ../dist/Kalendra-Setup-$VERSION.zip Kalendra-Setup-$VERSION.exe)
+          mkdir -p portable/Kalendra-Portable/Daten
+          cp publish/Kalendra.exe installer/portable/portable.txt installer/portable/LIESMICH.txt portable/Kalendra-Portable/
+          touch portable/Kalendra-Portable/Daten/.keep
+          (cd portable && zip -9 -r ../dist/Kalendra-$VERSION-Portable.zip Kalendra-Portable)
+          sed "s/VERSION/$VERSION/g" installer/RELEASE-NOTES.md > dist/notes.md
+          ls -la dist
+
+      - name: Release veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$VERSION" dist/*.zip --title "Kalendra $VERSION" --notes-file dist/notes.md --target "$GITHUB_SHA" \
+          || gh release upload "v$VERSION" dist/*.zip --clobber

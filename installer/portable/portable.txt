@@ -1,0 +1,1 @@
+Diese Datei schaltet Kalendra in den portablen Modus: Alle Daten liegen im Ordner "Daten" neben Kalendra.exe.

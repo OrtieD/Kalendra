@@ -17,7 +17,7 @@ Was du am PC einträgst, erscheint auf Mac und iPhone, und umgekehrt.
 - Installer (ohne Administratorrechte) oder portable Version für den USB-Stick
 
 ## Download
-Unter [Releases](../../releases):
+Unter [Releases](../../releases). Neue Versionen baut GitHub selbst: Actions → Release → „Run workflow“, Version eintragen.
 - `Kalendra-Setup-<Version>.zip`: entpacken, Setup starten
 - `Kalendra-<Version>-Portable.zip`: entpacken, `Kalendra.exe` starten, Daten liegen im Ordner `Daten`
 

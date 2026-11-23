@@ -1,0 +1,16 @@
+Kalendra - portable Version
+=================================
+
+Starten: Doppelklick auf Kalendra.exe. Keine Installation nötig.
+Der Ordner kann z. B. auf einen USB-Stick kopiert werden.
+
+Alle Termine, Kalender und Einstellungen liegen im Ordner "Daten" neben Kalendra.exe.
+Die installierte Version (Kalendra-Setup) nutzt dagegen %APPDATA%\Kalendra.
+Beide Versionen sind voneinander unabhängig.
+
+Anmeldungen (iCloud-Passwort, Google-Zugang) sind an den Windows-Benutzer gebunden.
+Auf einem anderen PC fragt Kalendra deshalb einmal neu danach. Die Termine sind sofort da.
+
+Windows-Hinweis beim ersten Start: "Der Computer wurde durch Windows geschützt"
+-> "Weitere Informationen" -> "Trotzdem ausführen". Das erscheint, weil Kalendra
+nicht mit einem kostenpflichtigen Zertifikat signiert ist.
