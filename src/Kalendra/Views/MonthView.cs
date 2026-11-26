@@ -113,7 +113,7 @@ public class MonthView : UserControl
             }
             chip = new Border { Background = selected ? Look.Solid(color) : Brushes.Transparent, CornerRadius = new CornerRadius(4), Padding = new Thickness(5, 1), Margin = new Thickness(4, 0), Child = g };
         }
-        ToolTip.SetTip(chip, ev.AllDay ? ev.Title : $"{ev.Title}\n{ev.Start:HH:mm} – {ev.End:HH:mm}{(string.IsNullOrEmpty(ev.Location) ? "" : "\n" + ev.Location)}");
+        ToolTip.SetTip(chip, ev.AllDay ? ev.Title : $"{ev.Title}\n{ev.Start:HH:mm} – {ev.End:HH:mm}{(string.IsNullOrEmpty(ev.Location) ? "" : "\n" + ev.Location)}{WeekView.MeetingTip(ev)}");
         chip.PointerPressed += (_, e) =>
         {
             e.Handled = true;

@@ -35,6 +35,11 @@ public class StoredItem
     public bool Dirty { get; set; }
     /// <summary>Deleted locally, must be deleted on the server (tombstone).</summary>
     public bool Deleted { get; set; }
+    /// <summary>Google only: a Meet link should be created for this event at the next sync.</summary>
+    public bool MeetRequested { get; set; }
+    public int MeetTries { get; set; }
+    /// <summary>Meet link Google created for this event (shown even if the server copy does not carry it yet).</summary>
+    public string? MeetingLink { get; set; }
 }
 
 /// <summary>A single occurrence of an event as shown in the views.</summary>
@@ -50,6 +55,13 @@ public class CalendarEvent
     public bool AllDay { get; set; }
     public string Location { get; set; } = "";
     public string Notes { get; set; } = "";
+    /// <summary>Link to the online meeting (Google Meet, Zoom, Teams …), empty if none.</summary>
+    public string MeetingUrl { get; set; } = "";
+    /// <summary>Set by the editor: create a Google Meet link when saving (Google calendars only).</summary>
+    public bool AddGoogleMeet { get; set; }
+    /// <summary>A Google Meet link has been requested but not created yet.</summary>
+    public bool MeetPending { get; set; }
+    public bool HasMeeting => MeetingUrl.Length > 0 || MeetPending;
     public bool IsRecurring { get; set; }
     /// <summary>Start of this occurrence as calculated from the series (used to edit/delete single occurrences).</summary>
     public DateTime OccurrenceStart { get; set; }

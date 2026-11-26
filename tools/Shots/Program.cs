@@ -23,7 +23,12 @@ void Add(string cal, string t, DateTime s, double h, string loc = "", bool all =
     store.Save(new CalendarEvent { CalendarId = cal, Title = t, Start = s, End = all ? s.Date.AddDays(h) : s.AddHours(h), AllDay = all, Location = loc }, null);
 Add(A, "Team-Meeting", ws.AddHours(9), 1, "Raum 2");
 Add(A, "Projekt-Review", ws.AddDays(1).AddHours(10.5), 1.5);
-Add(A, "Kundentermin", ws.AddDays(1).AddHours(11), 1, "Zoom");
+Add(A, "Kundentermin", ws.AddDays(1).AddHours(11), 1);
+{
+    var k = store.VisibleEventsInYear(ws.AddDays(1).Year).First(e => e.Title == "Kundentermin");
+    var ko = k.Clone(); k.MeetingUrl = "https://zoom.us/j/84512345678?pwd=Xyz"; k.Notes = "Angebot besprechen";
+    store.Save(k, ko);
+}
 Add(P, "Zahnarzt", ws.AddDays(2).AddHours(8), 0.75, "Praxis Dr. Weber");
 Add(S, "Laufen", ws.AddDays(2).AddHours(18), 1);
 Add(F, "Abendessen bei Oma", ws.AddDays(4).AddHours(19), 2.5);
@@ -70,6 +75,19 @@ var ed = new Kalendra.Views.EventEditor(store, store.VisibleEventsInYear(DateTim
 ed.Show(); for (int i = 0; i < 5; i++) Dispatcher.UIThread.RunJobs();
 ed.CaptureRenderedFrame()!.Save(Path.Combine(outDir, "dialog.png"));
 Console.WriteLine("saved dialog");
+ed.Close();
+void ShotEditor(CalendarEvent ev, bool isNew, string name)
+{
+    var d = new Kalendra.Views.EventEditor(store, ev, isNew);
+    d.Show(); for (int i = 0; i < 5; i++) Dispatcher.UIThread.RunJobs();
+    d.CaptureRenderedFrame()!.Save(Path.Combine(outDir, name + ".png"));
+    d.Close();
+    Console.WriteLine("saved " + name);
+}
+ShotEditor(store.VisibleEventsInYear(ws.AddDays(1).Year).First(e => e.Title == "Kundentermin").Clone(), false, "online-zoom");
+var gcal = store.Data.Calendars.FirstOrDefault(c => store.IsGoogle(c)) ?? store.Data.Calendars[0];
+ShotEditor(new CalendarEvent { CalendarId = gcal.Id, Title = "Neues Ereignis", Start = ws.AddDays(2).AddHours(14), End = ws.AddDays(2).AddHours(15) }, true, "online-neu");
+ShotEditor(new CalendarEvent { CalendarId = gcal.Id, Title = "Team-Call", Start = ws.AddDays(2).AddHours(14), End = ws.AddDays(2).AddHours(15), MeetPending = true }, false, "online-meet");
 
 // Google sign-in dialog
 _ = Kalendra.Views.AccountDialog.ShowGoogle(win, state.Sync, null);

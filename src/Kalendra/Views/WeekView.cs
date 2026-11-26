@@ -188,6 +188,10 @@ public class WeekView : UserControl
         }
     }
 
+    public static string MeetingTip(CalendarEvent ev) =>
+        ev.MeetingUrl.Length > 0 ? "\nOnline-Meeting: " + Kalendra.Services.Meeting.Name(ev.MeetingUrl) + " (Doppelklick → Beitreten)"
+        : ev.MeetPending ? "\nGoogle Meet: Link wird erstellt …" : "";
+
     Control EventBlock(CalendarEvent ev, double height)
     {
         var color = _s.Store.Calendar(ev.CalendarId)?.Color ?? "#1BADF8";
@@ -196,7 +200,19 @@ public class WeekView : UserControl
         var text = new StackPanel();
         text.Children.Add(new TextBlock { Text = ev.Title, FontSize = 12, FontWeight = FontWeight.SemiBold, Foreground = fg, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = height > 40 ? TextWrapping.Wrap : TextWrapping.NoWrap, MaxHeight = Math.Max(16, height - 20) });
         if (height >= 34)
-            text.Children.Add(new TextBlock { Text = ev.Start.ToString("HH:mm") + (string.IsNullOrEmpty(ev.Location) ? "" : " · " + ev.Location), FontSize = 11, Foreground = fg, Opacity = 0.85, TextTrimming = TextTrimming.CharacterEllipsis });
+        {
+            var line = new TextBlock { Text = ev.Start.ToString("HH:mm") + (string.IsNullOrEmpty(ev.Location) ? "" : " · " + ev.Location), FontSize = 11, Foreground = fg, Opacity = 0.85, TextTrimming = TextTrimming.CharacterEllipsis };
+            if (ev.HasMeeting)
+            {
+                var dock = new DockPanel();
+                var icon = EventEditor.VideoIcon(fg, 12);
+                icon.Margin = new Thickness(0, 0, 4, 0);
+                DockPanel.SetDock(icon, Dock.Left);
+                dock.Children.Add(icon); dock.Children.Add(line);
+                text.Children.Add(dock);
+            }
+            else text.Children.Add(line);
+        }
         var inner = new Border
         {
             Background = sel ? Look.Solid(color) : Look.Tint(color, 0.22),
@@ -206,7 +222,7 @@ public class WeekView : UserControl
         };
         var grip = new Border { Height = 6, VerticalAlignment = VerticalAlignment.Bottom, Background = Brushes.Transparent, Cursor = new Cursor(StandardCursorType.SizeNorthSouth) };
         var host = new Panel { Children = { inner, grip } };
-        ToolTip.SetTip(host, $"{ev.Title}\n{ev.Start:HH:mm} – {ev.End:HH:mm}{(string.IsNullOrEmpty(ev.Location) ? "" : "\n" + ev.Location)}");
+        ToolTip.SetTip(host, $"{ev.Title}\n{ev.Start:HH:mm} – {ev.End:HH:mm}{(string.IsNullOrEmpty(ev.Location) ? "" : "\n" + ev.Location)}{MeetingTip(ev)}");
 
         host.PointerPressed += (_, e) =>
         {

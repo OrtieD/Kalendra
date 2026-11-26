@@ -305,6 +305,28 @@ public class SyncService
             }
         }
 
+        // 4b. Google: create requested Meet links (needs the Calendar API, CalDAV cannot do it)
+        if (acc.Kind == AccountKind.Google)
+        {
+            foreach (var item in _store.Data.Items.Where(i => i.MeetRequested && !i.Dirty && !i.Deleted && i.Href != null && myCalIds.Contains(i.CalendarId)).ToList())
+            {
+                var cal = _store.Calendar(item.CalendarId)!;
+                try
+                {
+                    var link = await GoogleMeet.CreateAsync(_auth[acc.Id]!, cal.Href!, item.Uid);
+                    item.MeetRequested = false;
+                    if (link != null) item.MeetingLink = link;
+                    cal.CTag = null; // read back Google's version with the conference
+                }
+                catch (CalDavException ex) when (ex.Status != HttpStatusCode.Unauthorized)
+                {
+                    SyncLog.Write("Google Meet: " + ex.Message);
+                    if (++item.MeetTries >= 5 || ex.Status == HttpStatusCode.Forbidden && item.MeetTries >= 3) item.MeetRequested = false;
+                    problems.Add(ex.Message);
+                }
+            }
+        }
+
         // 5. download changes
         foreach (var cal in mine().ToList())
         {
