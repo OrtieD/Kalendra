@@ -89,8 +89,21 @@ public class EventEditor : Window
             else if (!readOnly)
             {
                 var isGoogle = store.IsGoogle(SelectedCal());
-                var meetItem = new MenuItem { Header = isGoogle ? "Google Meet (Link automatisch erstellen)" : "Google Meet (nur in Google-Kalendern)", IsEnabled = isGoogle };
-                meetItem.Click += (_, _) => { addMeet = true; RenderMeeting(); };
+                var googleCal = cals.FindIndex(c => store.IsGoogle(c));
+                var meetItem = new MenuItem
+                {
+                    Header = isGoogle ? "Google Meet (Link automatisch erstellen)"
+                        : googleCal >= 0 ? $"Google Meet (wechselt zum Google-Kalender „{cals[googleCal].Name}“)"
+                        : "Google Meet (zuerst ein Google-Konto verbinden)",
+                    IsEnabled = isGoogle || googleCal >= 0,
+                };
+                meetItem.Click += (_, _) =>
+                {
+                    addMeet = true;
+                    // Meet links only exist in Google calendars: pick one instead of refusing
+                    if (!store.IsGoogle(SelectedCal()) && googleCal >= 0) calBox.SelectedIndex = googleCal;
+                    RenderMeeting();
+                };
                 var pasteItem = new MenuItem { Header = "Link einfügen (Zoom, Teams, Webex …)" };
                 pasteItem.Click += (_, _) => { editingLink = true; RenderMeeting(); linkBox.Focus(); };
                 var add = new Button
@@ -103,7 +116,12 @@ public class EventEditor : Window
             }
             else meetingHost.Children.Add(new TextBlock { Text = "–", Foreground = Look.Secondary });
         }
-        calBox.SelectionChanged += (_, _) => { if (!addMeet && !editingLink && meetingLink.Length == 0) RenderMeeting(); };
+        calBox.SelectionChanged += (_, _) =>
+        {
+            if (!editingLink && meetingLink.Length == 0) RenderMeeting();
+            if (addMeet && !store.IsGoogle(SelectedCal())) Show(error, "Google Meet geht nur in Google-Kalendern. Bitte einen Google-Kalender wählen oder einen Link einfügen.");
+            else error.IsVisible = false;
+        };
         RenderMeeting();
 
         var notes = new TextBox { Text = ev.Notes, Watermark = "Notizen", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 80 };

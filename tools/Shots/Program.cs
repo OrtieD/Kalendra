@@ -1,3 +1,4 @@
+using Avalonia.LogicalTree;
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Threading;
@@ -87,6 +88,20 @@ void ShotEditor(CalendarEvent ev, bool isNew, string name)
 ShotEditor(store.VisibleEventsInYear(ws.AddDays(1).Year).First(e => e.Title == "Kundentermin").Clone(), false, "online-zoom");
 var gcal = store.Data.Calendars.FirstOrDefault(c => store.IsGoogle(c)) ?? store.Data.Calendars[0];
 ShotEditor(new CalendarEvent { CalendarId = gcal.Id, Title = "Neues Ereignis", Start = ws.AddDays(2).AddHours(14), End = ws.AddDays(2).AddHours(15) }, true, "online-neu");
+{
+    // "Google Meet" chosen while a non-Google calendar is selected → switches to the Google calendar
+    var d = new Kalendra.Views.EventEditor(store, new CalendarEvent { CalendarId = P, Title = "Test", Start = ws.AddHours(9), End = ws.AddHours(10) }, true);
+    d.Show(); for (int i = 0; i < 5; i++) Dispatcher.UIThread.RunJobs();
+    var btn = d.GetLogicalDescendants().OfType<Avalonia.Controls.Button>().First(b => b.Flyout is Avalonia.Controls.MenuFlyout);
+    var mi = ((Avalonia.Controls.MenuFlyout)btn.Flyout!).Items.OfType<Avalonia.Controls.MenuItem>().First();
+    Console.WriteLine($"Meet-Eintrag: {mi.Header} aktiv={mi.IsEnabled}");
+    mi.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.MenuItem.ClickEvent));
+    for (int i = 0; i < 5; i++) Dispatcher.UIThread.RunJobs();
+    var cb = d.GetLogicalDescendants().OfType<Avalonia.Controls.ComboBox>().First();
+    for (int i = 0; i < 20; i++) { Dispatcher.UIThread.RunJobs(); Thread.Sleep(20); }
+    Console.WriteLine("Kalender danach: " + store.Data.Calendars.Where(c => !c.ReadOnly).ElementAt(cb.SelectedIndex).Name + " / Texte: " + string.Join(" | ", d.GetLogicalDescendants().OfType<Avalonia.Controls.TextBlock>().Select(t => t.Text).Where(t => t != null && t.Contains("Meet"))));
+    d.Close();
+}
 ShotEditor(new CalendarEvent { CalendarId = gcal.Id, Title = "Team-Call", Start = ws.AddDays(2).AddHours(14), End = ws.AddDays(2).AddHours(15), MeetPending = true }, false, "online-meet");
 
 // Google sign-in dialog
