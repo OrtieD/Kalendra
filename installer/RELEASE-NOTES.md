@@ -11,4 +11,4 @@ Windows zeigt beim ersten Start vielleicht „Der Computer wurde durch Windows g
 - Zwei-Wege-Abgleich mit iCloud und Google Kalender (CalDAV)
 - Google-Kalender alternativ nur zum Anzeigen über die iCal-Adresse ([Anleitung](https://github.com/OrtieD/kalendra/blob/main/docs/ANLEITUNG-GOOGLE.md))
 - Roter Knopf „＋ Neues Ereignis“
-- Online-Meetings im Termin: Google Meet automatisch (Google-Kalender) oder Zoom-, Teams- und andere Links, mit „Beitreten“-Knopf
+- Online-Meetings im Termin: Google Meet automatisch (wählt den Google-Kalender selbst aus) oder Zoom-, Teams- und andere Links, mit „Beitreten“-Knopf
