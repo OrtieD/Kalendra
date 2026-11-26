@@ -24,6 +24,8 @@ Die legst du einmalig kostenlos in der Google Cloud Console an. Dauert etwa 10 M
 2. Oben „Projekt auswählen“ → **Neues Projekt**, Name z. B. `Kalendra` → Erstellen.
 3. Links **APIs & Dienste → Bibliothek**, nach **CalDAV API** suchen → **Aktivieren**.
    (Wichtig: die *CalDAV API*, nicht nur die „Google Calendar API“.)
+4. Für automatische **Google-Meet-Links** zusätzlich nach **Google Calendar API** suchen → **Aktivieren**.
+   (Ohne sie funktioniert alles andere, nur Meet-Links können dann nicht erstellt werden.)
 
 ### 2. Zustimmungsbildschirm (OAuth consent screen / „Google Auth Platform“)
 1. **APIs & Dienste → OAuth-Zustimmungsbildschirm** → Benutzertyp **Extern**.
@@ -48,6 +50,14 @@ Die legst du einmalig kostenlos in der Google Cloud Console an. Dauert etwa 10 M
 
 Die Google-Kalender erscheinen links unter **GOOGLE**. Rechtsklick auf ⟳ zeigt Konto,
 Sync-Protokoll, „Erneut anmelden“ und „Abmelden“.
+
+### Online-Meeting im Termin
+Im Termin-Fenster bei **Online** → **Online-Meeting hinzufügen**:
+- **Google Meet**: Kalendra lässt Google beim nächsten Abgleich einen Meet-Link erzeugen
+  (nur in Google-Kalendern, braucht die „Google Calendar API“ aus Schritt 1.4).
+- **Link einfügen**: Zoom-, Teams-, Webex- oder anderen Link einfügen. Geht in jedem Kalender
+  und erscheint auch am Mac und in Google in den Notizen.
+Bei Terminen mit Meeting zeigt das Termin-Fenster **Beitreten** und **Link kopieren**.
 
 Wenn etwas nicht klappt: links unten **Protokoll anzeigen** öffnen und den Inhalt schicken
 (es enthält keine Passwörter oder Schlüssel).

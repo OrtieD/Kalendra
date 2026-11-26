@@ -66,6 +66,10 @@ public class EventStore
         File.Move(tmp, _file, true);
     }
 
+    public AccountInfo? AccountOf(CalendarSource? cal) => cal?.AccountId == null ? null : Data.Accounts.FirstOrDefault(a => a.Id == cal.AccountId);
+    /// <summary>Google calendars can get a Meet link created automatically.</summary>
+    public bool IsGoogle(CalendarSource? cal) => cal is { IsRemote: true, ReadOnly: false } && AccountOf(cal)?.Kind == AccountKind.Google;
+
     public CalendarSource? Calendar(string id) => Data.Calendars.FirstOrDefault(c => c.Id == id);
     public StoredItem? Item(string id) => Data.Items.FirstOrDefault(i => i.Id == id);
 
@@ -103,6 +107,8 @@ public class EventStore
     {
         var targetCal = Calendar(edited.CalendarId) ?? Data.Calendars.First();
         if (targetCal.ReadOnly) throw new InvalidOperationException($"Der Kalender „{targetCal.Name}“ ist schreibgeschützt.");
+        var wantMeet = edited.AddGoogleMeet && IsGoogle(targetCal);
+        if (wantMeet) edited.MeetingUrl = "";
         StoredItem item;
         if (original == null || string.IsNullOrEmpty(edited.ItemId) || Item(edited.ItemId) is not { } existing)
         {
@@ -113,13 +119,19 @@ public class EventStore
         else
         {
             item = existing;
-            var newIcs = Ics.Update(item.Ics, edited, original);
+            var newIcs = Ics.Update(item.Ics, edited, original, existing.MeetingLink);
+            if (existing.MeetingLink != null && edited.MeetingUrl != existing.MeetingLink) existing.MeetingLink = null;
+            if (!wantMeet && edited.MeetingUrl.Length == 0) existing.MeetRequested = false;
             if (item.CalendarId != targetCal.Id)
             {
                 // moving between calendars = delete in the old one, create in the new one
                 if (item.Href != null) { item.Deleted = true; item.Dirty = true; }
                 else Data.Items.Remove(item);
-                item = new StoredItem { CalendarId = targetCal.Id, Uid = existing.Uid, Ics = newIcs, Dirty = targetCal.IsRemote };
+                item = new StoredItem
+                {
+                    CalendarId = targetCal.Id, Uid = existing.Uid, Ics = newIcs, Dirty = targetCal.IsRemote,
+                    MeetingLink = existing.MeetingLink, MeetRequested = existing.MeetRequested && IsGoogle(targetCal),
+                };
                 Data.Items.Add(item);
             }
             else
@@ -128,6 +140,7 @@ public class EventStore
                 item.Dirty = targetCal.IsRemote;
             }
         }
+        if (wantMeet) { item.MeetRequested = true; item.MeetTries = 0; item.MeetingLink = null; }
         LocalChange();
         return item.Id + "|" + edited.Start.Ticks;
     }

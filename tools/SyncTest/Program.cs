@@ -180,6 +180,56 @@ async Task GoogleTests(EventStore store, SyncService sync, string dir, string gU
     await sync.SyncAsync();
     Check(store.VisibleEventsInYear(y).Any(e => e.Title == "Vom Handy (Google)"), "Google-Termin sichtbar");
 
+    Console.WriteLine("P2. Online-Meeting: Google Meet automatisch erstellen");
+    CalendarEvent Find(string title) => store.VisibleEventsInYear(y).First(e => e.Title == title);
+    var meetStart = first.AddDays(6).AddHours(15);
+    store.Save(new CalendarEvent { CalendarId = gCals[0].Id, Title = "Team-Call", Notes = "Agenda folgt", Start = meetStart, End = meetStart.AddHours(1), AddGoogleMeet = true }, null);
+    Check(Find("Team-Call").MeetPending, "vor dem Sync: Link wird erstellt");
+    await sync.SyncAsync();
+    var tc = Find("Team-Call");
+    var tcItem = store.Item(tc.ItemId)!;
+    Check(!sync.IsError && tc.MeetingUrl.StartsWith("https://meet.google.com/") && !tc.MeetPending, "Meet-Link da: " + tc.MeetingUrl + " / " + sync.Status);
+    var tcServer = await (await gHttp.GetAsync($"http://127.0.0.1:5232/gmail/termine/{tcItem.Uid}.ics")).Content.ReadAsStringAsync();
+    Check(tcServer.Contains("X-GOOGLE-CONFERENCE:" + tc.MeetingUrl), "Konferenz bei Google eingetragen");
+    Check(tc.Notes == "Agenda folgt", "Notizen unverändert: " + tc.Notes);
+    var orig = tc.Clone(); tc.Title = "Team-Call (neu)";
+    store.Save(tc, orig); await sync.SyncAsync();
+    tcServer = await (await gHttp.GetAsync($"http://127.0.0.1:5232/gmail/termine/{tcItem.Uid}.ics")).Content.ReadAsStringAsync();
+    Check(tcServer.Contains("SUMMARY:Team-Call (neu)") && tcServer.Contains("X-GOOGLE-CONFERENCE") && !tcServer.Contains("Online-Meeting:"), "Titel geändert, Meet bleibt, keine doppelte Notiz");
+
+    Console.WriteLine("P3. Google Calendar API nicht aktiviert → verständliche Meldung, später klappt es");
+    await Control("/_apioff");
+    store.Save(new CalendarEvent { CalendarId = gCals[0].Id, Title = "Meet ohne API", Start = meetStart.AddDays(1), End = meetStart.AddDays(1).AddHours(1), AddGoogleMeet = true }, null);
+    await sync.SyncAsync();
+    Check(sync.IsError && sync.Status.Contains("Google Calendar API"), "Meldung: " + sync.Status);
+    Check(sync.FirstNeedingLogin == null, "Konto bleibt angemeldet");
+    Check(Find("Meet ohne API").MeetPending, "Wunsch bleibt bestehen");
+    await Control("/_apion");
+    await sync.SyncAsync();
+    Check(!sync.IsError && Find("Meet ohne API").MeetingUrl.StartsWith("https://meet.google.com/"), "nach Aktivieren erstellt: " + sync.Status);
+
+    Console.WriteLine("P4. Zoom-Link im iCloud-Kalender");
+    var ic = store.Data.Calendars.First(c => c.IsRemote && c.AccountId != g!.Id && !c.ReadOnly);
+    store.Save(new CalendarEvent { CalendarId = ic.Id, Title = "Zoom mit Kunde", Notes = "Bitte Unterlagen", Start = meetStart.AddDays(2), End = meetStart.AddDays(2).AddHours(1), MeetingUrl = "https://zoom.us/j/123456789?pwd=abc" }, null);
+    await sync.SyncAsync();
+    var zi = store.Data.Items.First(i => i.Ics.Contains("Zoom mit Kunde"));
+    var zServer = (await http.GetAsync(zi.Href)).Content.ReadAsStringAsync().Result;
+    Check(zServer.Contains("URL") && zServer.Replace("\r\n ", "").Contains("Online-Meeting: https://zoom.us/j/123456789?pwd=abc"), "Link auf dem Server (URL + Notiz)");
+    var z = Find("Zoom mit Kunde");
+    Check(z.MeetingUrl == "https://zoom.us/j/123456789?pwd=abc" && z.Notes == "Bitte Unterlagen" && Meeting.Name(z.MeetingUrl) == "Zoom", $"wieder gelesen: {z.MeetingUrl} / {z.Notes}");
+    var zo = z.Clone(); z.MeetingUrl = "";
+    store.Save(z, zo); await sync.SyncAsync();
+    zServer = (await http.GetAsync(zi.Href)).Content.ReadAsStringAsync().Result;
+    Check(!zServer.Contains("zoom.us") && zServer.Contains("Bitte Unterlagen"), "Link entfernt, Notiz bleibt");
+
+    Console.WriteLine("P5. Links von anderen Geräten erkennen");
+    var tItem = new StoredItem { Ics = Ev("t-1", "Teams vom Mac", "DTSTART:20300101T090000Z", "DTEND:20300101T100000Z").Replace("END:VEVENT", "LOCATION:https://teams.microsoft.com/l/meetup-join/19%3ameeting\r\nEND:VEVENT") };
+    var t1 = Ics.Expand(tItem, new DateTime(2029, 12, 1), new DateTime(2030, 2, 1)).Single();
+    Check(Meeting.Name(t1.MeetingUrl) == "Microsoft Teams", "Teams-Link im Ort erkannt: " + t1.MeetingUrl);
+    var gItem = new StoredItem { Ics = Ev("g-2", "Google-Termin", "DTSTART:20300101T090000Z", "DTEND:20300101T100000Z").Replace("END:VEVENT", "DESCRIPTION:Bitte pünktlich\\n\\n-::~:~::~:~:~::-\\nJoin with Google Meet: https://meet.google.com/xyz-abcd-efg\\n-::~:~::~:~:~::-\r\nX-GOOGLE-CONFERENCE:https://meet.google.com/xyz-abcd-efg\r\nEND:VEVENT") };
+    var g1 = Ics.Expand(gItem, new DateTime(2029, 12, 1), new DateTime(2030, 2, 1)).Single();
+    Check(g1.MeetingUrl == "https://meet.google.com/xyz-abcd-efg" && g1.Notes == "Bitte pünktlich", $"Google-Meet erkannt, Notiz bereinigt: „{g1.Notes}“");
+
     Console.WriteLine("Q. Zugangstoken abgelaufen → wird automatisch erneuert");
     await Control("/_expire");
     await sync.SyncAsync();

@@ -91,7 +91,9 @@ public static class Ics
                 CalendarId = item.CalendarId,
                 Title = string.IsNullOrEmpty(src.Summary) ? "(Ohne Titel)" : src.Summary,
                 Location = src.Location ?? "",
-                Notes = src.Description ?? "",
+                Notes = Meeting.CleanNotes(src.Description),
+                MeetingUrl = MeetingLink(src) ?? item.MeetingLink ?? "",
+                MeetPending = item.MeetRequested,
                 AllDay = allDay,
                 Start = start,
                 End = end,
@@ -101,6 +103,19 @@ public static class Ics
         }
         return list;
     }
+
+    const string GoogleConference = "X-GOOGLE-CONFERENCE";
+
+    static string? GoogleConferenceLink(IcalEvent e) =>
+        e.Properties.FirstOrDefault(p => p.Name == GoogleConference)?.Value?.ToString() is { Length: > 0 } v ? v.Trim() : null;
+
+    /// <summary>The meeting link of an event: Google's conference, Kalendra's notes line, a known service in URL, location or notes.</summary>
+    static string? MeetingLink(IcalEvent e) =>
+        GoogleConferenceLink(e)
+        ?? Meeting.FromNoteLine(e.Description)
+        ?? (Meeting.ProviderName(e.Url?.ToString()) != null ? e.Url!.ToString() : null)
+        ?? Meeting.FindIn(e.Location)
+        ?? Meeting.FindIn(e.Description);
 
     static DateTime ToLocal(IDateTime dt)
     {
@@ -148,7 +163,7 @@ public static class Ics
         var cal = new IcalCalendar();
         cal.ProductId = "-//Kalendra//Kalendra 0.3//DE";
         var e = new IcalEvent { Uid = uid, DtStamp = new CalDateTime(DateTime.UtcNow, "UTC") };
-        Fill(e, ev, setTimes: true);
+        Fill(e, ev, setTimes: true, null, null);
         cal.Events.Add(e);
         return Serialize(cal);
     }
@@ -157,18 +172,19 @@ public static class Ics
     /// Applies edits to an existing .ics. For a series, time changes shift the whole series by the
     /// same amount; text changes apply to the series.
     /// </summary>
-    public static string Update(string ics, CalendarEvent edited, CalendarEvent original)
+    /// <param name="serviceLink">Meet link Google created for this event; never written into the notes.</param>
+    public static string Update(string ics, CalendarEvent edited, CalendarEvent original, string? serviceLink = null)
     {
         var cal = TryLoad(ics) ?? throw new InvalidOperationException("Ereignis kann nicht gelesen werden.");
         var master = Master(cal)!;
         var isSeries = master.RecurrenceRules.Count > 0;
         if (!isSeries)
         {
-            Fill(master, edited, setTimes: true);
+            Fill(master, edited, setTimes: true, original, serviceLink);
         }
         else
         {
-            Fill(master, edited, setTimes: false);
+            Fill(master, edited, setTimes: false, original, serviceLink);
             var delta = edited.Start - original.Start;
             var newDuration = edited.End - edited.Start;
             if (delta != TimeSpan.Zero || newDuration != original.End - original.Start || edited.AllDay != original.AllDay)
@@ -229,11 +245,27 @@ public static class Ics
         return null;
     });
 
-    static void Fill(IcalEvent e, CalendarEvent ev, bool setTimes)
+    static void Fill(IcalEvent e, CalendarEvent ev, bool setTimes, CalendarEvent? original, string? serviceLink)
     {
         e.Summary = ev.Title;
         e.Location = string.IsNullOrWhiteSpace(ev.Location) ? null : ev.Location;
-        e.Description = string.IsNullOrWhiteSpace(ev.Notes) ? null : ev.Notes;
+        var url = ev.MeetingUrl?.Trim() ?? "";
+        // Leave notes and link untouched when neither changed: keeps Google's Meet text and Apple's formatting.
+        if (original == null || url != original.MeetingUrl || ev.Notes != original.Notes)
+        {
+            var conference = GoogleConferenceLink(e);
+            if (url != (original?.MeetingUrl ?? "") && conference != null && conference != url)
+                e.Properties.Remove(GoogleConference); // the Google Meet was removed or replaced in Kalendra
+            var notes = ev.Notes ?? "";
+            // write the link into the notes so it shows on every device; Google's own Meet shows by itself
+            if (url.Length > 0 && url != conference && url != serviceLink) notes = Meeting.WithNoteLine(notes, url);
+            e.Description = string.IsNullOrWhiteSpace(notes) ? null : notes;
+            if (url != (original?.MeetingUrl ?? ""))
+            {
+                if (url.Length > 0 && url != serviceLink && Uri.TryCreate(url, UriKind.Absolute, out var u)) e.Url = u;
+                else if (e.Url != null && original != null && e.Url.ToString().TrimEnd('/') == original.MeetingUrl.TrimEnd('/')) e.Url = null;
+            }
+        }
         if (!setTimes) return;
         e.DtStart = ToIcal(ev.Start, ev.AllDay);
         var end = ev.AllDay && ev.End.Date <= ev.Start.Date ? ev.Start.Date.AddDays(1) : ev.End;
